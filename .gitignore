@@ -54,3 +54,4 @@ bin
 
 # LLM tools
 .codegraph/
+!bin/kimchi

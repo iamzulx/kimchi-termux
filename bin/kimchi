@@ -1,0 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Kimchi Termux launcher — rebuilt for Node.js (no Bun, no glibc binary)
+# Usage: kimchi [args...]
+set -euo pipefail
+
+KIMCHI_DIR="${KIMCHI_DIR:-$HOME/kimchi}"
+BUNDLE="$KIMCHI_DIR/dist/kimchi-bundle.mjs"
+
+if [ ! -f "$BUNDLE" ]; then
+  echo "✗ Bundle not found: $BUNDLE" >&2
+  echo "  Run: cd $KIMCHI_DIR && node scripts/build-bundle.mjs" >&2
+  exit 1
+fi
+
+export PI_PACKAGE_DIR="$KIMCHI_DIR/share/kimchi"
+export PI_CODING_AGENT_DIR="$HOME/.config/kimchi/harness"
+export PI_SKIP_VERSION_CHECK=1
+export NODE_OPTIONS="--max-old-space-size=2048"
+
+exec node "$BUNDLE" "$@"
