@@ -59,4 +59,13 @@ installProxyAgent()
 // Install before the dynamic cli.js import - the interceptor must wrap process.stdin.emit before any pi-* listener attaches. See src/paste-interceptor.ts for the rationale (LLM-1358).
 installPasteInterceptor()
 
+// Force exit after 30 seconds to prevent hanging on Node.js event loop
+const exitTimer = setTimeout(() => {
+  process.kill(process.pid, "SIGKILL")
+}, 30000).unref()
+
 await import("./cli.js")
+
+// Clear timer and force exit immediately (bypass signal handlers)
+clearTimeout(exitTimer)
+process.kill(process.pid, "SIGKILL")
