@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { CURRENT_SESSION_VERSION, type SessionHeader } from "@earendil-works/pi-coding-agent"
 import { v7 as uuidv7 } from "uuid"
+import { cleanupOldSessionFiles } from "./session-cleanup.js"
 
 export interface AgentSessionFile {
 	sessionId: string
@@ -33,5 +34,7 @@ export function prepareAgentSessionFile(
 		parentSession: parentSessionFile,
 	}
 	writeFileSync(sessionFile, `${JSON.stringify(header)}\n`, { mode: 0o600 })
+	// Clean up stale sibling sessions without blocking creation of the new one.
+	cleanupOldSessionFiles(parentSessionDir, [parentSessionFile, sessionFile])
 	return { sessionId, sessionFile }
 }

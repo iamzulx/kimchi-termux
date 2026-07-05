@@ -54,6 +54,7 @@ import {
 } from "../tool-helpers.js"
 import { FERMENT_TOOLS } from "../tool-names.js"
 import {
+	AbandonFermentParams,
 	AskUserParams,
 	CompleteFermentParams,
 	ConfirmCompletionCriteriaParams,
@@ -66,6 +67,7 @@ import { setActiveFermentAndApplyProfile } from "../tool-scope.js"
 import type { FermentUi } from "../ui.js"
 
 type ScopeArgs = Static<typeof ScopeParams>
+type AbandonFermentArgs = Static<typeof AbandonFermentParams>
 type ProposeScopingArgs = Static<typeof ProposeScopingParams>
 type NormalizedProposeScopingArgs = Omit<
 	ProposeScopingArgs,
@@ -791,6 +793,35 @@ export async function completeFerment(runtime: FermentRuntime, params: CompleteF
 	)
 }
 
+export async function abandonFerment(runtime: FermentRuntime, params: AbandonFermentArgs): Promise<ToolResult> {
+	const applyAndPersist = createApplyAndPersist(runtime)
+
+	const fSnapshot = runtime.getStorage().get(params.ferment_id)
+	if (!fSnapshot) return toolErr("Ferment not found.")
+	if (fSnapshot.status === "abandoned") {
+		return toolOk(`Ferment "${fSnapshot.name}" is already abandoned.`)
+	}
+	if (fSnapshot.status === "complete") {
+		return toolErr(`Ferment "${fSnapshot.name}" is complete and cannot be abandoned.`)
+	}
+
+	const outcome = applyAndPersist(params.ferment_id, {
+		type: "abandon",
+		reason: params.reason,
+	})
+	if (!outcome.ok) return failedToolResult(outcome.error, fSnapshot)
+
+	runtime.clearFermentState(params.ferment_id)
+	resetReactiveContinuationNudgeCount(params.ferment_id)
+	runtime.setActive(undefined)
+
+	const fresh = outcome.ferment
+	const reasonLine = params.reason ? `\n\nReason: ${params.reason}` : ""
+	const terminalNotice = `This ferment is abandoned and terminal. Do not call bash/read/list_ferments or any ferment tools for this ferment again without clear user consent. If the user wants a new ferment, tell them to run \`/ferment new "..."\` or \`/ferment one-shot "..."\` — do not search MCP tools or invent a tool.`
+
+	return toolOk(`**Ferment "${fresh.name}"** abandoned.${reasonLine}\n\n---\n\n${terminalNotice}`)
+}
+
 export function registerLifecycleTools(pi: ExtensionAPI, runtime: FermentRuntime = defaultFermentRuntime): void {
 	const applyAndPersist = createApplyAndPersist(runtime)
 
@@ -1189,6 +1220,20 @@ ${renderGateGuidance("complete_ferment")}`,
 		},
 		async execute(_, params) {
 			return completeFerment(runtime, params)
+		},
+	})
+
+	pi.registerTool({
+		name: FERMENT_TOOLS.ABANDON,
+		label: "Abandon Ferment",
+		description: `Abandon the active ferment. Use this when the user explicitly cancels the work, the goal is no longer valid, or the plan cannot proceed. The ferment becomes terminal and cannot be resumed or completed.`,
+		parameters: AbandonFermentParams,
+		renderResult(result) {
+			const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+			return new Markdown(text, 1, 0, getMarkdownTheme())
+		},
+		async execute(_, params) {
+			return abandonFerment(runtime, params)
 		},
 	})
 

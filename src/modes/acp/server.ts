@@ -3,6 +3,7 @@
 
 import { closeSync, openSync, readFileSync, readSync, readdirSync } from "node:fs"
 import { join } from "node:path"
+import { cleanupOldSessionFiles } from "../../extensions/agents/manager/session-cleanup.js"
 import { Readable, Writable } from "node:stream"
 import {
 	type SessionInfo as AcpSessionInfo,
@@ -1311,6 +1312,7 @@ function defaultSessionLoader(options: RunAcpOptions): AcpSessionLoader {
 			resourceLoader,
 			sessionManager,
 		})
+		cleanupOldSessionFiles(sessionDir, sessionManager.getSessionFile())
 		return session
 	}
 }

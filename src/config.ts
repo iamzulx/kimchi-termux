@@ -4,6 +4,19 @@ import { dirname, join, relative, resolve } from "node:path"
 import { SUPERPOWERS_SKILL_PATH } from "./extensions/superpowers/config.js"
 import { getVersion } from "./utils.js"
 
+/**
+ * Expand environment variable references in a string value.
+ * Supports `$VAR` and `${VAR}` syntax.
+ * Example: `$KIMCHI_API_KEY` → process.env.KIMCHI_API_KEY
+ */
+function expandEnv(value: string): string {
+	return value.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_, envVar) => {
+		return process.env[envVar] ?? `\${${envVar}}`
+	}).replace(/\$([A-Z_][A-Z0-9_]*)(?![A-Z0-9_])/g, (_, envVar) => {
+		return process.env[envVar] ?? `\$${envVar}`
+	})
+}
+
 const KIMCHI_CONFIG_PATH = resolve(homedir(), ".config", "kimchi", "config.json")
 const AGENT_CONFIG_DIR = resolve(homedir(), ".config", "kimchi", "harness")
 const KIMCHI_LLM_ENDPOINT = "https://llm.kimchi.dev/openai/v1"
@@ -155,16 +168,17 @@ export interface KimchiConfig {
 /**
  * Read the Cast AI API key from the kimchi CLI config file.
  * Returns undefined if the file doesn't exist or the field is missing.
+ * Supports environment variable expansion: $VAR or ${VAR} syntax.
  */
 export function readApiKeyFromConfigFile(configPath: string = KIMCHI_CONFIG_PATH): string | undefined {
 	try {
 		const raw = readFileSync(configPath, "utf-8")
 		const parsed = JSON.parse(raw)
 		if (typeof parsed.apiKey === "string" && parsed.apiKey.length > 0) {
-			return parsed.apiKey
+			return expandEnv(parsed.apiKey)
 		}
 		if (typeof parsed.api_key === "string" && parsed.api_key.length > 0) {
-			return parsed.api_key
+			return expandEnv(parsed.api_key)
 		}
 		return undefined
 	} catch {
@@ -238,12 +252,12 @@ function readConfigExtras(configPath: string): {
 				: undefined
 		const onboarding = parseOnboardingConfig(parsed.onboarding)
 		const preferences = parsePreferencesConfig(parsed.preferences)
-		// Read apiKey (prefer camelCase, fall back to snake_case)
+		// Read apiKey (prefer camelCase, fall back to snake_case) with env var expansion
 		let apiKey: string | undefined
 		if (typeof parsed.apiKey === "string" && parsed.apiKey.length > 0) {
-			apiKey = parsed.apiKey
+			apiKey = expandEnv(parsed.apiKey)
 		} else if (typeof parsed.api_key === "string" && parsed.api_key.length > 0) {
-			apiKey = parsed.api_key
+			apiKey = expandEnv(parsed.api_key)
 		}
 
 		// Read llmEndpoint
