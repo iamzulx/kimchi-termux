@@ -50,7 +50,9 @@ kimchi-session-*.html
 *.bun-build
 
 .memory
-bin
+bin/
+!bin/kimchi
+!bin/kimchi
 
 # LLM tools
 .codegraph/

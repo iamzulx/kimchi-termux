@@ -17,23 +17,29 @@ export PI_SKIP_VERSION_CHECK=1
 export KIMCHI_DISABLE_BUILTIN_PROVIDERS=1
 export NODE_OPTIONS="--max-old-space-size=2048"
 
-# Quick commands that exit naturally — no workaround needed
 ARGS="$*"
+
+# Interactive commands — run directly with stdin (no background)
+case "$ARGS" in
+  setup*|login*|""|--continue*|-c*|--resume*|-r*)
+    exec node "$BUNDLE" "$@"
+    ;;
+esac
+
+# Quick commands that exit naturally
 case "$ARGS" in
   version*|--help*|-h|--version*|-v|--list-models*|config*)
     exec node "$BUNDLE" "$@"
     ;;
 esac
 
-# For commands that may hang (API calls, coding tasks):
+# Non-interactive commands (print, coding tasks):
 # Node.js event loop holds HTTP connections after CLI completes.
-# Bun (official) auto-exits, Node.js doesn't.
-# Strategy: run in background, monitor output, disown before kill to suppress messages.
+# Strategy: run in background, monitor output, force-exit when done.
 TMPFILE=$(mktemp)
 TMPERR=$(mktemp)
 trap "rm -f $TMPFILE $TMPERR" EXIT
 
-# Disable job control to suppress "Killed" messages
 set +m
 node "$BUNDLE" "$@" > "$TMPFILE" 2> "$TMPERR" &
 NODE_PID=$!
