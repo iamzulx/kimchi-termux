@@ -60,6 +60,3 @@ installProxyAgent()
 installPasteInterceptor()
 
 await import("./cli.js")
-
-// Graceful exit — Node.js event loop may hold HTTP connections
-process.exit(0)

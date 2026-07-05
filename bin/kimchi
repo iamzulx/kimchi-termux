@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Kimchi Termux launcher — rebuilt for Node.js (no Bun, no glibc binary)
+# Kimchi Termux launcher — rebuilt for Node.js
 set -uo pipefail
 
 KIMCHI_DIR="${KIMCHI_DIR:-$HOME/kimchi}"
@@ -7,7 +7,6 @@ BUNDLE="$KIMCHI_DIR/dist/kimchi-bundle.mjs"
 
 if [ ! -f "$BUNDLE" ]; then
   echo "✗ Bundle not found: $BUNDLE" >&2
-  echo "  Run: cd $KIMCHI_DIR && node scripts/build-bundle.mjs" >&2
   exit 1
 fi
 
@@ -19,71 +18,56 @@ export NODE_OPTIONS="--max-old-space-size=2048"
 
 ARGS="$*"
 
-# Interactive commands — run directly with stdin (no background)
+# === ROUTE 1: Interactive (needs stdin, user controls exit) ===
 case "$ARGS" in
-  setup*|login*|""|--continue*|-c*|--resume*|-r*)
+  setup*|login*|""|--continue*|-c|--continue|--resume*|-r|--resume)
     exec node "$BUNDLE" "$@"
     ;;
 esac
 
-# Quick commands that exit naturally
-case "$ARGS" in
-  version*|--help*|-h|--version*|-v|--list-models*|config*)
-    exec node "$BUNDLE" "$@"
+# === ROUTE 2: Quick commands (output fast, event loop hangs → timeout kills it) ===
+case "$1" in
+  version|--version|-v|--help|-h|config|update|resources|--list-models)
+    timeout 8 node --no-warnings "$BUNDLE" "$@"
+    exit 0
     ;;
 esac
 
-# Non-interactive commands (print, coding tasks):
-# Node.js event loop holds HTTP connections after CLI completes.
-# Strategy: run in background, monitor output, force-exit when done.
-TMPFILE=$(mktemp)
-TMPERR=$(mktemp)
-trap "rm -f $TMPFILE $TMPERR" EXIT
+# === ROUTE 3: Long commands (--print, --yolo, coding tasks) ===
+# These take 10-60s for API response, so can't use short timeout.
+# Background + monitor file + kill when output stabilizes.
+OUTFILE=$(mktemp)
+trap "rm -f $OUTFILE" EXIT
 
-set +m
-node "$BUNDLE" "$@" > "$TMPFILE" 2> "$TMPERR" &
-NODE_PID=$!
-disown "$NODE_PID" 2>/dev/null
-set -m
+node --no-warnings "$BUNDLE" "$@" > "$OUTFILE" 2>&1 &
+PID=$!
 
 PREV_SIZE=0
-STABLE_COUNT=0
+STABLE=0
 ELAPSED=0
 
-while kill -0 "$NODE_PID" 2>/dev/null; do
-  sleep 2
-  ELAPSED=$((ELAPSED + 2))
-  
-  CUR_SIZE=$(wc -c < "$TMPFILE" 2>/dev/null || echo 0)
+while kill -0 "$PID" 2>/dev/null; do
+  sleep 1
+  ELAPSED=$((ELAPSED + 1))
+  CUR_SIZE=$(stat -c%s "$OUTFILE" 2>/dev/null || echo 0)
   
   if [ "$CUR_SIZE" -eq "$PREV_SIZE" ] && [ "$CUR_SIZE" -gt 0 ]; then
-    STABLE_COUNT=$((STABLE_COUNT + 1))
-    if [ "$STABLE_COUNT" -ge 2 ]; then
-      kill -TERM "$NODE_PID" 2>/dev/null
-      sleep 1
-      kill -KILL "$NODE_PID" 2>/dev/null
-      wait "$NODE_PID" 2>/dev/null
-      cat "$TMPFILE"
-      [ -s "$TMPERR" ] && cat "$TMPERR" >&2
-      exit 0
+    STABLE=$((STABLE + 1))
+    if [ "$STABLE" -ge 3 ]; then
+      kill -9 "$PID" 2>/dev/null
+      break
     fi
   else
-    STABLE_COUNT=0
+    STABLE=0
   fi
   PREV_SIZE=$CUR_SIZE
   
-  if [ "$ELAPSED" -ge 120 ]; then
-    kill -TERM "$NODE_PID" 2>/dev/null
-    sleep 1
-    kill -KILL "$NODE_PID" 2>/dev/null
-    wait "$NODE_PID" 2>/dev/null
-    cat "$TMPFILE"
-    [ -s "$TMPERR" ] && cat "$TMPERR" >&2
-    exit 0
+  if [ "$ELAPSED" -ge 300 ]; then
+    kill -9 "$PID" 2>/dev/null
+    break
   fi
 done
 
-wait "$NODE_PID" 2>/dev/null
-cat "$TMPFILE"
-[ -s "$TMPERR" ] && cat "$TMPERR" >&2
+wait "$PID" 2>/dev/null
+cat "$OUTFILE"
 exit 0
