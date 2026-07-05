@@ -1,0 +1,32 @@
+# Patch: read tool — prevent models defaulting limit=100
+#
+# Problem: All models (DeepSeek, Kimi, MiniMax, Nemotron) default to limit=100
+# when reading files, even though DEFAULT_MAX_LINES is 2000. This causes
+# incomplete file reads for audit/review tasks — only first 100 lines are read.
+#
+# Root cause: The tool `read` schema has a parameter `limit` with description
+# "Maximum number of lines to read" but no default value. All models interpret
+# this as "I should pick a limit" and choose 100 (a round "safe" number).
+#
+# Fix: Update tool description and limit parameter description to instruct
+# models to NOT use the limit parameter by default. The system already handles
+# truncation at 2000 lines / 50KB.
+#
+# Verified: 4/4 models tested (v4-flash, kimi-k2.7, minimax-m3, nemotron-3)
+# all correctly read 200-line test file after patch (previously stopped at 100).
+#
+# Apply to: dist/kimchi-bundle.mjs (post-build, lines 281446 + 281605)
+# Or apply to node_modules/@earendil-works/pi-coding-agent/dist/core/tools/read.js (pre-build, line 19 + 136)
+#
+--- a/dist/core/tools/read.js
++++ b/dist/core/tools/read.js
+@@ -16,7 +16,7 @@
+     readSchema = Type.Object({
+       path: Type.String({ description: "Path to the file to read (relative or absolute)" }),
+       offset: Type.Optional(Type.Number({ description: "Line number to start reading from (1-indexed)" })),
+-      limit: Type.Optional(Type.Number({ description: "Maximum number of lines to read" })),
++      limit: Type.Optional(Type.Number({ description: "Maximum number of lines to read. Omit this param to read the full file — the system handles truncation at 2000 lines." })),
+     });
+ 
+-    description: `Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.`
++    description: `Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). By default, read the FULL file without limit. Only use offset+limit for files over 2000 lines.`
