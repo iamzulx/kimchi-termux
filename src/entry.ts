@@ -66,6 +66,6 @@ const exitTimer = setTimeout(() => {
 
 await import("./cli.js")
 
-// Clear timer and force exit immediately (bypass signal handlers)
+// Clear timer and exit gracefully
 clearTimeout(exitTimer)
-process.kill(process.pid, "SIGKILL")
+process.exit(0)
