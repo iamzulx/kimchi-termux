@@ -1,8 +1,15 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Kimchi Termux launcher — rebuilt for Node.js
+# Kimchi Termux launcher — hardened for security
 set -uo pipefail
 
+# === SECURITY: Path validation ===
 KIMCHI_DIR="${KIMCHI_DIR:-$HOME/kimchi}"
+# Prevent path traversal
+if [[ "$KIMCHI_DIR" == *..* ]]; then
+  echo "✗ Invalid KIMCHI_DIR: path traversal detected" >&2
+  exit 1
+fi
+
 BUNDLE="$KIMCHI_DIR/dist/kimchi-bundle.mjs"
 
 if [ ! -f "$BUNDLE" ]; then
@@ -10,13 +17,32 @@ if [ ! -f "$BUNDLE" ]; then
   exit 1
 fi
 
+# === SECURITY: Resource limits ===
+# Prevent runaway memory consumption (2GB soft limit)
+ulimit -v 2097152 2>/dev/null || true  # Virtual memory: 2GB
+ulimit -f 1048576 2>/dev/null || true  # File size: 1GB
+
+# === SECURITY: Environment variables ===
 export PI_PACKAGE_DIR="$KIMCHI_DIR/share/kimchi"
 export PI_CODING_AGENT_DIR="$HOME/.config/kimchi/harness"
 export PI_SKIP_VERSION_CHECK=1
 export KIMCHI_DISABLE_BUILTIN_PROVIDERS=1
+export KIMCHI_TELEMETRY_ENABLED=0  # CRITICAL: Disable telemetry
 export NODE_OPTIONS="--max-old-space-size=2048"
 
 ARGS="$*"
+
+# === SECURITY: Signal forwarding ===
+# Forward SIGINT/SIGTERM to child process to prevent orphans
+cleanup() {
+  if [ -n "${CHILD_PID:-}" ] && kill -0 "$CHILD_PID" 2>/dev/null; then
+    kill -TERM "$CHILD_PID" 2>/dev/null
+    sleep 0.5
+    kill -KILL "$CHILD_PID" 2>/dev/null
+  fi
+  rm -f "$OUTFILE" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
 
 # === ROUTE 1: Interactive (needs stdin, user controls exit) ===
 case "$ARGS" in
@@ -34,19 +60,19 @@ case "$1" in
 esac
 
 # === ROUTE 3: Long commands (--print, --yolo, coding tasks) ===
-# These take 10-60s for API response, so can't use short timeout.
-# Background + monitor file + kill when output stabilizes.
-OUTFILE=$(mktemp)
-trap "rm -f $OUTFILE" EXIT
+# Background + monitor file + kill when output stabilizes
+# SECURITY: Use explicit mktemp with 0600 permissions
+OUTFILE=$(mktemp -t kimchi.XXXXXX)
+chmod 600 "$OUTFILE"
 
 node --no-warnings "$BUNDLE" "$@" > "$OUTFILE" 2>&1 &
-PID=$!
+CHILD_PID=$!
 
 PREV_SIZE=0
 STABLE=0
 ELAPSED=0
 
-while kill -0 "$PID" 2>/dev/null; do
+while kill -0 "$CHILD_PID" 2>/dev/null; do
   sleep 1
   ELAPSED=$((ELAPSED + 1))
   CUR_SIZE=$(stat -c%s "$OUTFILE" 2>/dev/null || echo 0)
@@ -54,7 +80,15 @@ while kill -0 "$PID" 2>/dev/null; do
   if [ "$CUR_SIZE" -eq "$PREV_SIZE" ] && [ "$CUR_SIZE" -gt 0 ]; then
     STABLE=$((STABLE + 1))
     if [ "$STABLE" -ge 3 ]; then
-      kill -9 "$PID" 2>/dev/null
+      # SECURITY: Validate PID before kill (prevent PID reuse attack)
+      if [ -d "/proc/$CHILD_PID" ]; then
+        CMDLINE=$(cat "/proc/$CHILD_PID/cmdline" 2>/dev/null || echo "")
+        if [[ "$CMDLINE" == *"node"* ]] && [[ "$CMDLINE" == *"kimchi-bundle.mjs"* ]]; then
+          kill -TERM "$CHILD_PID" 2>/dev/null
+          sleep 0.5
+          kill -KILL "$CHILD_PID" 2>/dev/null
+        fi
+      fi
       break
     fi
   else
@@ -63,11 +97,19 @@ while kill -0 "$PID" 2>/dev/null; do
   PREV_SIZE=$CUR_SIZE
   
   if [ "$ELAPSED" -ge 300 ]; then
-    kill -9 "$PID" 2>/dev/null
+    # SECURITY: Validate PID before kill
+    if [ -d "/proc/$CHILD_PID" ]; then
+      CMDLINE=$(cat "/proc/$CHILD_PID/cmdline" 2>/dev/null || echo "")
+      if [[ "$CMDLINE" == *"node"* ]] && [[ "$CMDLINE" == *"kimchi-bundle.mjs"* ]]; then
+        kill -TERM "$CHILD_PID" 2>/dev/null
+        sleep 0.5
+        kill -KILL "$CHILD_PID" 2>/dev/null
+      fi
+    fi
     break
   fi
 done
 
-wait "$PID" 2>/dev/null
+wait "$CHILD_PID" 2>/dev/null
 cat "$OUTFILE"
 exit 0

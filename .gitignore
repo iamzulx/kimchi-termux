@@ -19,9 +19,17 @@ src/core/export-html/
 .DS_Store
 Thumbs.db
 
-# Environment
+# Credentials & secrets
 .env
 .env.local
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+**/auth.json
+**/config.json
+**/.config/kimchi/
 AGENTS.local.md
 
 # Test coverage
@@ -50,10 +58,7 @@ kimchi-session-*.html
 *.bun-build
 
 .memory
-bin/
-!bin/kimchi
-!bin/kimchi
+bin
 
 # LLM tools
 .codegraph/
-!bin/kimchi
