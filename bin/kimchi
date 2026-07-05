@@ -18,8 +18,11 @@ if [ ! -f "$BUNDLE" ]; then
 fi
 
 # === SECURITY: Resource limits ===
-# Prevent runaway memory consumption (2GB soft limit)
-ulimit -v 2097152 2>/dev/null || true  # Virtual memory: 2GB
+# NOTE: Do NOT cap virtual memory (ulimit -v) for Node.js. V8 reserves a
+# large *virtual* address space (zones/guard pages/code space) far bigger
+# than the actual heap. Capping virtual memory makes V8's internal zone
+# mmap() get denied by the kernel -> "Zone Allocation failed - out of
+# memory" even while the real heap is nearly empty. Limit file size only.
 ulimit -f 1048576 2>/dev/null || true  # File size: 1GB
 
 # === SECURITY: Environment variables ===
@@ -28,7 +31,7 @@ export PI_CODING_AGENT_DIR="$HOME/.config/kimchi/harness"
 export PI_SKIP_VERSION_CHECK=1
 export KIMCHI_DISABLE_BUILTIN_PROVIDERS=1
 export KIMCHI_TELEMETRY_ENABLED=0  # CRITICAL: Disable telemetry
-export NODE_OPTIONS="--max-old-space-size=2048"
+export NODE_OPTIONS="--max-old-space-size=1024"  # 1GB heap: safe for 3.7GB device
 
 ARGS="$*"
 
@@ -40,7 +43,7 @@ cleanup() {
     sleep 0.5
     kill -KILL "$CHILD_PID" 2>/dev/null
   fi
-  rm -f "$OUTFILE" 2>/dev/null
+  rm -f "${OUTFILE:-}" 2>/dev/null
 }
 trap cleanup EXIT INT TERM
 
