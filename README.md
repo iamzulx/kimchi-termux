@@ -94,7 +94,7 @@ This rebuild:
 | `src/extensions/teleport/pty/xterm-core.ts` | ESM → CJS require via `createRequire()` | `@xterm/headless` exports CJS only |
 | `src/integrations/cursor.ts` | `bun:sqlite` → fallback chain | `bun:sqlite` is Bun-only |
 | `scripts/build-bundle.mjs` | New file — esbuild build script | Builds the ESM bundle for Node.js |
-| `src/entry-termux.ts` | New file — lightweight entry point | Bypasses heavy extension imports for subcommands |
+| `src/entry.ts` | Entry sets `PI_PACKAGE_DIR` before pi-mono imports | Same as upstream; built via esbuild |
 | `bin/kimchi` | New file — launcher script | Sets env vars and runs the bundle |
 | `src/extensions/behaviours/bodies-gen/*.js` | New files (6) — pre-built `.md`→`.js` | Inline string exports replacing `.md` imports |
 
@@ -104,7 +104,7 @@ Same as upstream, plus:
 
 ```
 scripts/build-bundle.mjs    -- esbuild build script (new)
-src/entry-termux.ts          -- Termux entry point (new)
+src/entry.ts                 -- entry (PI_PACKAGE_DIR before pi-mono)
 bin/kimchi                   -- launcher script (new)
 src/extensions/behaviours/bodies-gen/  -- pre-built .md→.js modules (new)
 share/kimchi/                -- runtime package dir (themes, oauth, vendor)
@@ -124,16 +124,30 @@ share/kimchi/                -- runtime package dir (themes, oauth, vendor)
 | `KIMCHI_API_KEY` | API key (overrides config) | from `~/.config/kimchi/harness/auth.json` |
 | `PI_PACKAGE_DIR` | Path to runtime package dir | auto-detected |
 | `PI_CODING_AGENT_DIR` | Agent config dir | `~/.config/kimchi/harness` |
-| `NODE_OPTIONS` | Node.js flags | `--max-old-space-size=2048` |
+| `NODE_OPTIONS` | Node.js flags | `--max-old-space-size=1024` (Termux launcher; do not use `ulimit -v`) |
 
 ## Build Commands
 
 ```bash
-pnpm install                     # install dependencies
+pnpm install                     # install dependencies (in repo or ~/kimchi)
 node scripts/build-bundle.mjs    # build Termux bundle → dist/kimchi-bundle.mjs
-pnpm run build                   # original upstream build (requires Bun)
-pnpm run dev                     # original upstream dev (requires Bun)
+cp dist/kimchi-bundle.mjs ~/kimchi/dist/   # deploy to runtime install
 ```
+
+**Note:** If `pnpm install` in this repo is too heavy on device RAM, run the build from `~/kimchi` (which has `node_modules`) using the portable `scripts/build-bundle.mjs` copied from this repo.
+
+## 9router (local OpenAI-compatible provider)
+
+1. Save your 9router API key (from `~/.9router/db` / dashboard) to `~/.config/kimchi/9router_api_key` (mode `600`).
+2. Launcher exports `NINEROUTER_API_KEY` automatically.
+3. `~/.config/kimchi/harness/models.json` should use `"apiKey": "$NINEROUTER_API_KEY"` for provider `9router`.
+4. Run: `kimchi --provider 9router --model Youth --print "..."`
+
+**Do not** set `defaultProvider` to `9router` until you have verified `baseUrl` and auth — incomplete provider config can break startup.
+
+## Self-update
+
+`kimchi update` is **disabled** in `bin/kimchi` on Termux. Official updates pull Bun/glibc binaries incompatible with Android/Bionic.
 
 ## Compared to Upstream
 

@@ -82,11 +82,11 @@ def main():
         "Path traversal validation"
     ))
     
-    # 3. Resource limits (ulimit)
+    # 3. Resource limits — must NOT cap virtual memory (ulimit -v breaks V8 on Termux)
     results.append(check_file_contains(
         launcher_path,
-        [r'ulimit\s+-v', r'ulimit\s+-f'],
-        "Resource limits (ulimit -v and -f)"
+        [r'Do NOT cap virtual memory', r'ulimit\s+-f'],
+        "Resource limits (no ulimit -v, file size cap only)"
     ))
     
     # 4. Signal forwarding (cleanup function)
@@ -99,8 +99,15 @@ def main():
     # 5. PID validation
     results.append(check_file_contains(
         launcher_path,
-        [r'/proc/\$CHILD_PID', r'kill -TERM "\$CHILD_PID"'],
-        "PID validation before kill"
+        [r'is_our_node', r'CHILD_PID=\$!', r'/proc/\$pid'],
+        "PID validation before kill (is_our_node + CHILD_PID)"
+    ))
+
+    # 5b. Block kimchi update on Termux
+    results.append(check_file_contains(
+        launcher_path,
+        [r'kimchi update is disabled', r'exit 1'],
+        "Self-update blocked (update subcommand)"
     ))
     
     # 6. Secure tmpfile

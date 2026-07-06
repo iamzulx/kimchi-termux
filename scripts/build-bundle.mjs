@@ -1,14 +1,25 @@
-// Build script for Termux — uses pnpm-resolved esbuild
-import { build } from '/data/data/com.termux/files/home/kimchi/node_modules/.pnpm/esbuild@0.27.7/node_modules/esbuild/lib/main.js';
+// Build script for Termux — portable esbuild resolution
+import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(join(__dirname, '..', 'package.json'));
+
+let build;
+try {
+  ({ build } = require('esbuild'));
+} catch {
+  const fallback = join(
+    process.env.HOME || '',
+    'kimchi/node_modules/.pnpm/esbuild@0.27.7/node_modules/esbuild/lib/main.js',
+  );
+  ({ build } = await import(fallback));
+}
 
 if (!existsSync('dist')) mkdirSync('dist');
 
-// Plugin: .md text imports → JS string exports
 const mdPlugin = {
   name: 'md-plugin',
   setup(b) {
@@ -23,7 +34,6 @@ const mdPlugin = {
   },
 };
 
-// Plugin: bodies-gen redirect — redirect .md bodies to pre-built .js
 const bodiesGenPlugin = {
   name: 'bodies-gen',
   setup(b) {
