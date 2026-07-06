@@ -30,4 +30,4 @@
 - `~/test-kimchi/` — unrelated Rust experiment
 - `~/.kimchi/` — unrelated Rust/docs tree
 
-`~/kimchi/` is a **runtime tree only** (no git). Canonical git: **kimchi-termux** only.
+`~/kimchi/` is **runtime only** (no `.git`). Canonical git: **kimchi-termux** only.
