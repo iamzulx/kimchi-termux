@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -18,7 +19,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const httpTimeout = 30 * time.Second
+const (
+	httpTimeout              = 30 * time.Second
+	maxWebSocketMessageSize = 256 << 20 // 256 MiB caps malicious frames while allowing large SSH transfers.
+)
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +41,29 @@ func isClosedNetworkError(err error) bool {
 	return strings.Contains(err.Error(), "use of closed network connection")
 }
 
+func isLoopbackHost(host string) bool {
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func requireSecureURL(rawURL, secureScheme, localScheme, label string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme == "" || u.Hostname() == "" {
+		return fmt.Errorf("invalid %s URL %q", label, rawURL)
+	}
+	if u.Scheme == secureScheme {
+		return nil
+	}
+	if u.Scheme == localScheme && isLoopbackHost(u.Hostname()) {
+		return nil
+	}
+	return fmt.Errorf("refusing insecure %s URL %q; use %s or loopback %s for local testing", label, rawURL, secureScheme, localScheme)
+}
+
 // ─── Tunnel orchestration ─────────────────────────────────────────────────────
 
 type tunnelCreds struct {
@@ -51,6 +78,9 @@ var buildWSURL = func(sandboxURL string, port int) string {
 }
 
 func resolveTunnelCredentials(ctx context.Context, sessionIDOrSandboxURL, apiKey, endpoint string, port int) (*tunnelCreds, error) {
+	if err := requireSecureURL(endpoint, "https", "http", "API endpoint"); err != nil {
+		return nil, err
+	}
 	orgID, err := cast.VerifyAPIKey(ctx, apiKey, endpoint)
 	if err != nil {
 		return nil, err
@@ -63,8 +93,12 @@ func resolveTunnelCredentials(ctx context.Context, sessionIDOrSandboxURL, apiKey
 	if err != nil {
 		return nil, err
 	}
+	wsURL := buildWSURL(sandboxURL, port)
+	if err := requireSecureURL(wsURL, "wss", "ws", "WebSocket endpoint"); err != nil {
+		return nil, err
+	}
 	return &tunnelCreds{
-		wsURL: buildWSURL(sandboxURL, port),
+		wsURL: wsURL,
 		token: token,
 	}, nil
 }
@@ -85,9 +119,9 @@ func runBinaryBridgeIO(ctx context.Context, wsURL, token string, stdin io.Reader
 	if err != nil {
 		return fmt.Errorf("websocket dial %s: %w", wsURL, err)
 	}
-	// Lift the default 32 MiB per-message read limit — SSH traffic can
-	// exceed it on large transfers and we're just splicing bytes.
-	ws.SetReadLimit(-1)
+	// Lift the default 32 MiB cap, but keep a hard ceiling to avoid OOM from
+	// malicious or compromised WebSocket peers.
+	ws.SetReadLimit(maxWebSocketMessageSize)
 	defer ws.CloseNow()
 
 	bridgeCtx, cancelBridge := context.WithCancel(ctx)
