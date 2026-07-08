@@ -34,7 +34,7 @@ index 5de0f24bfe4e9ccb7b9476dae9ea55f882acce75..e8bf2e8986ec53c8189a58764e47e16d
          return padded;
      }
 diff --git a/dist/components/markdown.js b/dist/components/markdown.js
-index 1f73455cddb2159279193624b6f703b9da275680..6446240059b47c4e729c4a03d29b32ba3fb25a4a 100644
+index 64766013e0705ff953cbdcfd3b8ac94913c3b623..ccef50d93ac2ae2987db927f9b67d22817b4b987 100644
 --- a/dist/components/markdown.js
 +++ b/dist/components/markdown.js
 @@ -1,6 +1,6 @@
@@ -45,7 +45,7 @@ index 1f73455cddb2159279193624b6f703b9da275680..6446240059b47c4e729c4a03d29b32ba
  const STRICT_STRIKETHROUGH_REGEX = /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
  class StrictStrikethroughTokenizer extends Tokenizer {
      del(src) {
-@@ -54,7 +54,8 @@ export class Markdown {
+@@ -78,7 +78,8 @@ export class Markdown {
              return this.cachedLines;
          }
          // Calculate available width for content (subtract horizontal padding)
@@ -55,7 +55,7 @@ index 1f73455cddb2159279193624b6f703b9da275680..6446240059b47c4e729c4a03d29b32ba
          // Don't render anything if there's no actual text
          if (!this.text || this.text.trim() === "") {
              const result = [];
-@@ -101,21 +102,22 @@ export class Markdown {
+@@ -126,21 +127,22 @@ export class Markdown {
                  continue;
              }
              const lineWithMargins = leftMargin + line + rightMargin;
@@ -85,12 +85,12 @@ index 1f73455cddb2159279193624b6f703b9da275680..6446240059b47c4e729c4a03d29b32ba
          }
          // Combine top padding, content, and bottom padding
 diff --git a/dist/components/text.js b/dist/components/text.js
-index 0d840239c41181e24dfc60237c3338081c6b48d5..85697c3aa728e9dda120d97234d407105f1c881d 100644
+index 0d840239c41181e24dfc60237c3338081c6b48d5..7208d53add7d89955c799f73d9d5ce134a5123b8 100644
 --- a/dist/components/text.js
 +++ b/dist/components/text.js
 @@ -1,4 +1,4 @@
 -import { applyBackgroundToLine, visibleWidth, wrapTextWithAnsi } from "../utils.js";
-+import { STROKE_PREFIX, STROKE_WIDTH, applyStrokeToLine, visibleWidth, wrapTextWithAnsi } from "../utils.js";
++import { STROKE_WIDTH, applyStrokeToLine, visibleWidth, wrapTextWithAnsi } from "../utils.js";
  /**
   * Text component - displays multi-line text with word wrapping
   */
@@ -135,10 +135,10 @@ index 0d840239c41181e24dfc60237c3338081c6b48d5..85697c3aa728e9dda120d97234d40710
          }
          const result = [...emptyLines, ...contentLines, ...emptyLines];
 diff --git a/dist/utils.js b/dist/utils.js
-index 9d00544d0858681339bb780057bda825f8054ca5..3a06068612dbea3a598c68a4dbfdb1702c80d19d 100644
+index bc550a400f3ac921263a8f2fa1753335b4fded8c..a9314e7ed5f39c4f31a5d38b17f84c07ccce8020 100644
 --- a/dist/utils.js
 +++ b/dist/utils.js
-@@ -764,6 +764,30 @@ export function applyBackgroundToLine(line, width, bgFn) {
+@@ -807,6 +807,30 @@ export function applyBackgroundToLine(line, width, bgFn) {
      const withPadding = line + padding;
      return bgFn(withPadding);
  }

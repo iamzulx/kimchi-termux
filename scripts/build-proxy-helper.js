@@ -20,6 +20,7 @@ const TARGETS = {
 	"darwin-x64": { goos: "darwin", goarch: "amd64", helperName: "proxy-helper" },
 	"linux-arm64": { goos: "linux", goarch: "arm64", helperName: "proxy-helper" },
 	"linux-x64": { goos: "linux", goarch: "amd64", helperName: "proxy-helper" },
+	"android-arm64": { goos: "android", goarch: "arm64", helperName: "proxy-helper" },
 	"windows-x64": { goos: "windows", goarch: "amd64", helperName: "proxy-helper.exe" },
 	"win-x64": { goos: "windows", goarch: "amd64", helperName: "proxy-helper.exe" },
 	"bun-darwin-arm64": { goos: "darwin", goarch: "arm64", helperName: "proxy-helper" },
@@ -40,6 +41,7 @@ function hostTargetKey() {
 	if (os === "darwin" && cpu === "x64") return "darwin-x64"
 	if (os === "linux" && cpu === "arm64") return "linux-arm64"
 	if (os === "linux" && cpu === "x64") return "linux-x64"
+	if (os === "android" && cpu === "arm64") return "android-arm64"
 	if (os === "win32" && cpu === "x64") return "windows-x64"
 	throw new Error(`Unsupported proxy-helper host platform: ${os}/${cpu}`)
 }

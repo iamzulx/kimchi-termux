@@ -26,7 +26,7 @@ echo "=== 5. Read-tool patch in bundle ==="
 grep -q "By default, read the FULL file" "$HOME/kimchi/dist/kimchi-bundle.mjs" && ok "read FULL in bundle" || bad "read patch"
 
 echo "=== 6. version + 9router smoke ==="
-kimchi version | grep -q "0.1.58" && ok "version"
+kimchi version | grep -q "0.1.60" && ok "version"
 timeout 90 kimchi --provider 9router --model Youth --print "reply exactly: VERIFY_OK" 2>&1 | grep -q VERIFY_OK && ok "9router Youth" || bad "9router Youth"
 
 echo "=== 7. Runtime vs repo launcher ==="

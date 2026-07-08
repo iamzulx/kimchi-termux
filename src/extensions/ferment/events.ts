@@ -69,6 +69,16 @@ function getToolCallNames(content: AssistantContentPart[]): string[] {
 	return content.filter((c) => c.type === "toolCall" && c.name).map((c) => c.name as string)
 }
 
+/** Safely extract a string field from an assistant message of unknown shape.
+ *  The turn_end event's `message` is typed loosely upstream, so casting
+ *  `{ errorMessage?: string }` directly would bypass compile-time safety if
+ *  the upstream shape changes. This narrows at runtime instead. */
+function getMessageStringField(message: unknown, field: string): string | undefined {
+	if (typeof message !== "object" || message === null) return undefined
+	const value = (message as Record<string, unknown>)[field]
+	return typeof value === "string" ? value : undefined
+}
+
 function extractPromptTextAfterLastToolCall(content: AssistantContentPart[]): string {
 	const lastToolCall = content.findLastIndex((c) => c.type === "toolCall")
 	return content
@@ -273,11 +283,12 @@ export function registerFermentEvents(
 		description: "When the ferment cwd is not a git repo, run `git init` instead of skipping.",
 	})
 
-	function recoverStuckFerments(): void {
+	function recoverStuckFerments(): string[] {
 		// On a fresh start with no active ferment marker, any ferment in
 		// "running" or "planned" must be stale — the previous process died
 		// without graceful shutdown. Pause them so their orphaned steps are
 		// reset to "pending" by handlePause and the engineer can restart them.
+		const recoveredNames: string[] = []
 		const applyAndPersist = createApplyAndPersist(runtime)
 		for (const f of runtime.getStorage().list()) {
 			if (f.status === "running" || f.status === "planned") {
@@ -290,6 +301,7 @@ export function registerFermentEvents(
 						// eslint-disable-next-line no-console
 						console.error("RECOVER FAILED for", f.id, outcome.error)
 					} else {
+						recoveredNames.push(outcome.ferment.name)
 						// Emit stalled telemetry for crash-recovered ferments.
 						// Load the full Ferment to access phases and lastActiveAt.
 						const full = runtime.getStorage().get(f.id)
@@ -303,6 +315,7 @@ export function registerFermentEvents(
 				}
 			}
 		}
+		return recoveredNames
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -320,7 +333,13 @@ export function registerFermentEvents(
 		const envId = getActiveFermentId()
 		if (!envId) {
 			try {
-				recoverStuckFerments()
+				const recovered = recoverStuckFerments()
+				if (recovered.length > 0 && ctx?.hasUI) {
+					const names = recovered.map((n) => `"${n}"`).join(", ")
+					ctx.ui?.notify?.(
+						`Recovered ${recovered.length === 1 ? "1 ferment" : `${recovered.length} ferments`} interrupted in a previous session: ${names}. Run /ferment resume to continue.`,
+					)
+				}
 			} catch {
 				// Best-effort recovery. If storage is unavailable during startup,
 				// we can't pause anything — the next clean start will retry.
@@ -495,6 +514,38 @@ export function registerFermentEvents(
 				} else {
 					ctx.ui.notify?.(
 						`Failed to pause "${abortedFerment.name}": ${outcome.error.message}. Run /ferment pause manually if needed.`,
+					)
+				}
+			}
+			if (activeId) {
+				resetReactiveContinuationNudgeCount(activeId)
+				resetFermentStopNudgeCount(activeId)
+				resetScopingStopNudgeCount(activeId)
+				resetScopingExploreTurns(activeId)
+			}
+			return
+		}
+
+		// Connection / provider / gateway failure: the model's turn ended with
+		// stopReason "error" after retries were exhausted (or the error was
+		// non-retryable). Pause the ferment so its state stays valid, reset all
+		// nudge counters, and surface a clear message to the user. Without this,
+		// the ferment stays "running" and the continuation-nudge logic fires on
+		// the next tick, sending the planner straight back into the broken state.
+		if (stopReason === "error") {
+			const errorMessage = getMessageStringField(event.message, "errorMessage")
+			const errorFerment = runtime.getActive()
+			if (errorFerment && (errorFerment.status === "running" || errorFerment.status === "planned")) {
+				const outcome = applyAndPersist(errorFerment.id, { type: "pause" })
+				if (outcome.ok) {
+					setActiveFermentAndApplyProfile(pi, runtime, outcome.ferment)
+					const detail = errorMessage ? `: ${errorMessage}` : ""
+					ctx.ui.notify?.(
+						`Interrupted: "${outcome.ferment.name}" was paused due to an error${detail}. Run /ferment resume to continue.`,
+					)
+				} else {
+					ctx.ui.notify?.(
+						`Connection error during "${errorFerment.name}" but pause failed: ${outcome.error.message}. Run /ferment pause manually.`,
 					)
 				}
 			}

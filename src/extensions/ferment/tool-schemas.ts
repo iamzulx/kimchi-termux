@@ -314,11 +314,6 @@ export const SkipPhaseParams = Type.Object({
 	reason: Type.Optional(Type.String()),
 })
 
-export const AbandonFermentParams = Type.Object({
-	ferment_id: Type.String(),
-	reason: Type.Optional(Type.String({ description: "Optional reason the ferment is being abandoned" })),
-})
-
 export const CompleteFermentParams = Type.Object({
 	ferment_id: Type.String(),
 	final_summary: Type.Optional(Type.String()),
