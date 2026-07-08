@@ -1,4 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const openMock = vi.hoisted(() => vi.fn<(_url: string) => Promise<void>>())
@@ -12,6 +15,13 @@ vi.mock("node:child_process", () => ({ execFileSync: execFileSyncMock }))
 const { default: reportBugExtension } = await import("./report-bug.js")
 
 type CommandConfig = { description: string; handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }
+let testSessionDir: string
+
+function testSessionFile(): string {
+	const file = join(testSessionDir, "test-session.jsonl")
+	writeFileSync(file, `${JSON.stringify({ role: "user", content: "Bearer sk-test...cdef" })}\n`, "utf-8")
+	return file
+}
 
 function makeMockPi(): { api: ExtensionAPI; commands: Map<string, CommandConfig> } {
 	const commands = new Map<string, CommandConfig>()
@@ -61,7 +71,7 @@ function makeUIContext(): ExtensionCommandContext {
 	return {
 		hasUI: true,
 		ui: { notify: vi.fn(), progress: vi.fn(), custom: vi.fn(), confirm: vi.fn() },
-		sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.jsonl") },
+		sessionManager: { getSessionFile: vi.fn(() => testSessionFile()) },
 		// biome-ignore lint/suspicious/noExplicitAny: minimal mock
 	} as any
 }
@@ -77,6 +87,7 @@ function makeHeadlessContext(): ExtensionCommandContext {
 
 describe("reportBugExtension", () => {
 	beforeEach(() => {
+		testSessionDir = mkdtempSync(join(tmpdir(), "kimchi-report-bug-test-"))
 		openMock.mockClear()
 		getVersionMock.mockClear()
 		getVersionMock.mockReturnValue("9.9.9-test")
@@ -85,6 +96,7 @@ describe("reportBugExtension", () => {
 	})
 
 	afterEach(() => {
+		rmSync(testSessionDir, { recursive: true, force: true })
 		vi.restoreAllMocks()
 	})
 
