@@ -99,6 +99,8 @@ if (!isDev) {
 
 	const superpowersSkillSrc = join(projectRoot, "vendor", "superpowers", "skills")
 	const superpowersSkillDst = join(projectRoot, "dist", "share", "kimchi", "vendor", "superpowers", "skills")
-	mkdirSync(superpowersSkillDst, { recursive: true })
-	cpSync(superpowersSkillSrc, superpowersSkillDst, { recursive: true })
+	if (existsSync(superpowersSkillSrc)) {
+		mkdirSync(superpowersSkillDst, { recursive: true })
+		cpSync(superpowersSkillSrc, superpowersSkillDst, { recursive: true })
+	}
 }

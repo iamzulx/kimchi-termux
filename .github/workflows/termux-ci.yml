@@ -1,0 +1,68 @@
+name: Termux-only CI
+
+on:
+  push:
+    branches: [main, master, sync-official-v0.1.60-termux]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  termux-build-test:
+    name: Termux Node bundle + targeted verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Setup Go for proxy-helper
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/proxy-helper/go.mod
+          cache-dependency-path: tools/proxy-helper/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: NODE_OPTIONS="--max-old-space-size=2048" pnpm exec tsc --noEmit
+
+      - name: Build proxy-helper
+        run: pnpm run build:proxy-helper
+
+      - name: Targeted tests
+        run: >-
+          NODE_OPTIONS="--max-old-space-size=2048" pnpm exec vitest run
+          src/extensions/pii-redaction/redactor.test.ts
+          src/utils/export-post-process.redaction.test.ts
+          src/commands/update.test.ts
+          src/update/github.test.ts
+          src/update/workflow.test.ts
+          src/extensions/agents/nudge-scheduler.test.ts
+
+      - name: Build Termux bundle
+        run: node scripts/build-bundle.mjs
+
+      - name: Apply read-tool full-file patch
+        run: python3 scripts/patch-bundle-read-limit.py dist/kimchi-bundle.mjs
+
+      - name: Verify read patch and Termux markers
+        run: |
+          grep -q "By default, read the FULL file" dist/kimchi-bundle.mjs
+          grep -q "kimchi update is disabled" bin/kimchi
+          grep -q "KIMCHI_DISABLE_BUILTIN_PROVIDERS" bin/kimchi
+          test -s dist/kimchi-bundle.mjs
