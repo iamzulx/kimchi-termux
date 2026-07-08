@@ -26,10 +26,14 @@ echo "=== 5. Read-tool patch in bundle ==="
 grep -q "By default, read the FULL file" "$HOME/kimchi/dist/kimchi-bundle.mjs" && ok "read FULL in bundle" || bad "read patch"
 
 echo "=== 6. version + 9router smoke ==="
-kimchi version | grep -q "0.1.58" && ok "version"
+kimchi version | grep -q "0.1.60" && ok "version"
 timeout 90 kimchi --provider 9router --model Youth --print "reply exactly: VERIFY_OK" 2>&1 | grep -q VERIFY_OK && ok "9router Youth" || bad "9router Youth"
 
-echo "=== 7. Runtime vs repo launcher ==="
+echo "=== 7. Runtime proxy-helper ==="
+test -x "$HOME/kimchi/share/kimchi/bin/proxy-helper" && ok "proxy-helper executable" || bad "proxy-helper missing"
+"$HOME/kimchi/share/kimchi/bin/proxy-helper" --help >/dev/null 2>&1 && ok "proxy-helper runs" || bad "proxy-helper run"
+
+echo "=== 8. Runtime vs repo launcher ==="
 diff -q "$HOME/kimchi/bin/kimchi" "$HOME/kimchi-termux/bin/kimchi" >/dev/null && ok "launcher synced" || bad "launcher drift"
 
 if [ "$FAIL" -eq 0 ]; then echo ""; echo "ALL VERIFY CHECKS PASSED"; exit 0; else echo ""; echo "SOME CHECKS FAILED"; exit 1; fi

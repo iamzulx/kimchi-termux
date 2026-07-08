@@ -43,6 +43,12 @@ function osSlug(): string {
 			return "darwin"
 		case "linux":
 			return "linux"
+		case "android":
+			// Termux runs Node with process.platform === "android", but Kimchi
+			// releases publish the compatible aarch64 artifact as linux_arm64.
+			// The launcher blocks self-update on Termux; this mapping keeps tests
+			// and dry-run/checksum helpers from failing before the launcher gate.
+			return "linux"
 		case "win32":
 			return "windows"
 		default:
@@ -86,6 +92,30 @@ export class GitHubClient {
 			{ headers: { Accept: "application/vnd.github+json" } },
 			{ fetchImpl: this.fetchImpl, retry: { maxRetries: THIRD_PARTY_MAX_RETRIES } },
 		)
+		if (!res.ok) {
+			throw new Error(`github API returned ${res.status}`)
+		}
+		const json = (await res.json()) as { tag_name?: unknown; html_url?: unknown }
+		if (typeof json.tag_name !== "string" || json.tag_name.length === 0) {
+			throw new Error("github API response missing tag_name")
+		}
+		return {
+			tagName: json.tag_name,
+			htmlUrl: typeof json.html_url === "string" ? json.html_url : "",
+		}
+	}
+
+	/** GET /repos/{owner}/{name}/releases/tags/{tag}. Returns tag + URL. */
+	async releaseByTag(repo: Repo, tag: string): Promise<ReleaseInfo> {
+		const url = `${this.apiBase}/repos/${repo.owner}/${repo.name}/releases/tags/${tag}`
+		const res = await fetchWithRetry(
+			url,
+			{ headers: { Accept: "application/vnd.github+json" } },
+			{ fetchImpl: this.fetchImpl, retry: { maxRetries: THIRD_PARTY_MAX_RETRIES } },
+		)
+		if (res.status === 404) {
+			throw new Error(`release ${tag} not found (404)`)
+		}
 		if (!res.ok) {
 			throw new Error(`github API returned ${res.status}`)
 		}

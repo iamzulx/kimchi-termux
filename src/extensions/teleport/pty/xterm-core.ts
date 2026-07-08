@@ -1,7 +1,8 @@
 import { copyToClipboard } from "@earendil-works/pi-coding-agent";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const { Terminal } = require("@xterm/headless") as typeof import("@xterm/headless");
+const { Terminal } = require("@xterm/headless") as typeof import("@xterm/headless")
+type XtermTerminal = InstanceType<typeof Terminal>
 
 const DEFAULT_COLOR = 256
 
@@ -21,7 +22,7 @@ export interface CursorState {
 }
 
 export class XtermCore {
-	private terminal: Terminal
+	private terminal: XtermTerminal
 	private cursorVisible = true
 	private _disposables: (() => void)[] = []
 
@@ -118,11 +119,11 @@ export class XtermCore {
 	}
 
 	private _trackCursorVisibility(): void {
-		const showHandler = this.terminal.parser.registerCsiHandler({ prefix: "?", final: "h" }, (params) => {
+		const showHandler = this.terminal.parser.registerCsiHandler({ prefix: "?", final: "h" }, (params: (number | number[])[]) => {
 			if (params.flat().includes(25)) this.cursorVisible = true
 			return false
 		})
-		const hideHandler = this.terminal.parser.registerCsiHandler({ prefix: "?", final: "l" }, (params) => {
+		const hideHandler = this.terminal.parser.registerCsiHandler({ prefix: "?", final: "l" }, (params: (number | number[])[]) => {
 			if (params.flat().includes(25)) this.cursorVisible = false
 			return false
 		})
@@ -131,7 +132,7 @@ export class XtermCore {
 	}
 
 	private _trackTmuxClipboardSync(): void {
-		const osc52Handler = this.terminal.parser.registerOscHandler(52, (data) => {
+		const osc52Handler = this.terminal.parser.registerOscHandler(52, (data: string) => {
 			// OSC 52 format: "<selection>;<base64>" where selection is 'c' (clipboard),
 			// 'p' (primary), 's' (secondary), or 'q' (selection).
 			const semicolonIndex = data.indexOf(";")

@@ -1335,6 +1335,7 @@ function defaultSessionFactory(options: RunAcpOptions): AcpSessionFactory {
 			settingsManager,
 			resourceLoader,
 		})
+		cleanupOldSessionFiles(join(options.agentDir, "sessions", encodeCwdDir(cwd)), session.sessionManager.getSessionFile())
 		return session
 	}
 }

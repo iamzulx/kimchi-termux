@@ -151,36 +151,60 @@ async function writeCursor(
 		throw new Error(`Cursor database not found at ${dbPath}`)
 	}
 
-	// Try bun:sqlite first (Bun runtime), then fallback to node:sqlite (Node 22+),
-	// then better-sqlite3 if available.
-	let Database: any = null;
+	// Try bun:sqlite first (Bun runtime), then fallback to node:sqlite (Node 22+).
+	// better-sqlite3 is intentionally not imported here: it is not a dependency in
+	// the Termux build and would make typecheck fail. Both supported runtimes expose
+	// compatible sync APIs, but under different export names.
+	type SqliteDb = {
+		exec(sql: string): void
+		query?(sql: string): { get(...args: unknown[]): unknown }
+		prepare?(sql: string): { get(...args: unknown[]): unknown; run(...args: unknown[]): unknown }
+		transaction?<T extends () => unknown>(fn: T): T
+		run?(sql: string, args?: unknown[]): unknown
+		close(): void
+	}
+	type DatabaseCtor = new (path: string) => SqliteDb
+	let Database: DatabaseCtor
 	try {
-		({ Database } = await import("bun:sqlite"));
+		const bunSqlite = (await import("bun:sqlite")) as unknown as { Database: DatabaseCtor }
+		Database = bunSqlite.Database
 	} catch {
-		try {
-			({ Database } = await import("node:sqlite"));
-		} catch {
-			const m = await import("better-sqlite3");
-			Database = m.default;
-		}
+		const nodeSqlite = await import("node:sqlite")
+		Database = nodeSqlite.DatabaseSync as unknown as DatabaseCtor
 	}
 
 	const db = new Database(dbPath)
+	const getRow = (): { value: string } | undefined => {
+		if (db.query) {
+			return db.query("SELECT value FROM ItemTable WHERE key = ?").get(CURSOR_REACTIVE_STORAGE_KEY) as
+				| { value: string }
+				| undefined
+		}
+		return db.prepare?.("SELECT value FROM ItemTable WHERE key = ?").get(CURSOR_REACTIVE_STORAGE_KEY) as
+			| { value: string }
+			| undefined
+	}
+	const runSql = (sql: string, args: unknown[]) => {
+		if (db.run) {
+			db.run(sql, args)
+			return
+		}
+		db.prepare?.(sql).run(...args)
+	}
 	try {
 		db.exec("PRAGMA busy_timeout = 5000")
-		const txn = db.transaction(() => {
-			const row = db
-				.query<{ value: string }, [string]>("SELECT value FROM ItemTable WHERE key = ?")
-				.get(CURSOR_REACTIVE_STORAGE_KEY)
+		const write = () => {
+			const row = getRow()
 			const storage: Record<string, unknown> = row?.value ? JSON.parse(row.value) : {}
 			mergeCursorConfig(storage, models)
-			db.run("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", [
+			runSql("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", [
 				CURSOR_REACTIVE_STORAGE_KEY,
 				JSON.stringify(storage),
 			])
-			db.run("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", [CURSOR_API_KEY_ROW, apiKey])
-		})
-		txn()
+			runSql("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", [CURSOR_API_KEY_ROW, apiKey])
+		}
+		if (db.transaction) db.transaction(write)()
+		else write()
 	} finally {
 		db.close()
 	}

@@ -5,3 +5,9 @@
 // 	const content: string
 // 	export default content
 // }
+
+// Termux/esbuild build: markdown bodies are generated as JS string modules.
+declare module "./bodies-gen/*.js" {
+	const content: string
+	export default content
+}

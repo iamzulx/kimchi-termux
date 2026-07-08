@@ -74,9 +74,23 @@ case "$1" in
     ;;
 esac
 
-# === ROUTE 2b: Quick commands ===
+# === ROUTE 2b: Pure display commands ===
+# Node may keep provider/http handles alive after printing; timeout 124 means
+# output was produced but the event loop did not drain. Treat that as success
+# only for read-only display commands.
 case "$1" in
-  version|--version|-v|--help|-h|config|resources|--list-models)
+  version|--version|-v|--help|-h|--list-models)
+    timeout 8 node --no-warnings "$BUNDLE" "$@"
+    CODE=$?
+    [ "$CODE" -eq 124 ] && exit 0
+    exit "$CODE"
+    ;;
+esac
+
+# === ROUTE 2c: Quick operational commands ===
+# Preserve non-zero exit codes here; hiding them masks auth/config failures.
+case "$1" in
+  config|resources)
     timeout 8 node --no-warnings "$BUNDLE" "$@"
     exit $?
     ;;

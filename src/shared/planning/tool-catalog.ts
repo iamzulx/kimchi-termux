@@ -156,9 +156,6 @@ export const FERMENT_MODE_TOOLS: ToolEntry[] = [
 	// Always-both: discovery — visible in both phases and also in idle
 	{ name: "list_ferments", modes: ["ferment"] },
 
-	// Emergency exit: abandon ferment at any time
-	{ name: "abandon_ferment", modes: ["ferment"] },
-
 	// User-facing: inline clarification question
 	// Included in planning phase because the planner may need to ask the user
 	// for clarification before activating.  Also available in implementation
@@ -193,21 +190,21 @@ export const FERMENT_MODE_TOOLS: ToolEntry[] = [
 
 /**
  * Execution / write tools.
- * `bash` is shared between adhoc and ferment; the remaining tools are also
- * shared between adhoc and ferment so they are visible across all profiles.
- * Per-command gating (read-only mode, permissions) is enforced at runtime,
- * not via catalog filtering — making the tools visible allows the model to
- * see they exist and emit better error messages when blocked.
+ * `bash` is shared between adhoc and ferment; the remaining tools are ferment-only.
+ *
+ * In `--plan` mode (`planning-adhoc`), `bash` is gated per-command by the
+ * read-only gate at `permissions/index.ts:549–558` — not by the catalog.
  */
 export const WRITE_TOOLS: ToolEntry[] = [
 	// Shared: available in both adhoc and ferment.
 	// In adhoc planning mode the runtime enforces read-only on a per-call basis.
 	{ name: "bash", modes: ["adhoc", "ferment"] },
-	{ name: "edit", modes: ["adhoc", "ferment"] },
-	{ name: "write", modes: ["adhoc", "ferment"] },
-	{ name: "Agent", modes: ["adhoc", "ferment"] },
-	{ name: "resume_subagent", modes: ["adhoc", "ferment"] },
-	{ name: "get_subagent_result", modes: ["adhoc", "ferment"] },
+	// Ferment implementation only
+	{ name: "edit", modes: ["ferment"] },
+	{ name: "write", modes: ["ferment"] },
+	{ name: "Agent", modes: ["ferment"] },
+	{ name: "resume_subagent", modes: ["ferment"] },
+	{ name: "get_subagent_result", modes: ["ferment"] },
 ]
 
 // ---------------------------------------------------------------------------
