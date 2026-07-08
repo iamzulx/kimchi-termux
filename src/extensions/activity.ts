@@ -14,10 +14,12 @@
 
 import { chmodSync, mkdirSync, unlinkSync } from "node:fs"
 import net from "node:net"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { isInSandboxCluster } from "../utils/sandbox.js"
 
-const SOCKET_DIR = "/tmp/kimchi"
+const SOCKET_DIR = join(tmpdir(), "kimchi")
 
 export class ActivityBus {
 	private server: net.Server | null = null
