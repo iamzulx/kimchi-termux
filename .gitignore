@@ -62,3 +62,4 @@ bin
 
 # LLM tools
 .codegraph/
+package-lock.json

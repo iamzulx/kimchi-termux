@@ -14,8 +14,6 @@
 		"build:binary": "node scripts/build-binary.js",
 		"install:local": "node scripts/install-local.js",
 		"build:binary-linux-arm64": "node scripts/build-binary.js --target linux-arm64",
-		"build:binary-linux-x64": "node scripts/build-binary.js --target linux-x64",
-		"build:binary-windows-x64": "node scripts/build-binary.js --target windows-x64",
 		"dev": "make -C tools/proxy-helper/ copy-for-dev && bun run --preload ./src/set-package-dir.ts src/entry.ts",
 		"dev:overlay": "scripts/dev-overlay.sh",
 		"dev:setup": "bun run --preload ./src/set-package-dir.ts src/entry.ts setup",
@@ -59,7 +57,7 @@
 		"shiki": "4.0.2",
 		"ssh2": "1.17.0",
 		"tar": "7.5.15",
-		"undici": "8.2.0",
+		"undici": "8.7.0",
 		"uuid": "14.0.0",
 		"wcwidth": "1.0.1",
 		"yaml": "2.8.4",
@@ -98,8 +96,8 @@
 		"tsx": "4.21.0",
 		"turndown": "7.2.4",
 		"typescript": "5.9.3",
-		"vitest": "3.2.4",
-		"ws": "8.20.1"
+		"vitest": "3.2.6",
+		"ws": "8.21.0"
 	},
 	"engines": {
 		"node": ">=22.0.0"

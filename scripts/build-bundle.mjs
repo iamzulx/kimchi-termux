@@ -40,7 +40,8 @@ const bodiesGenPlugin = {
 const external = [
   'node-pty', 'playwright', 'chromium-bidi', 'electron', 'fsevents',
   'bun:sqlite', 'better-sqlite3', 'node:sqlite',
-  '@mariozechner/clipboard-darwin-arm64', '@mariozechner/clipboard-darwin-x64',
+  '@mariozechner/clipboard',
+  '@mariozechner/clipboard-darwin-arm64', '@mariozechner/clipboard-darwin-universal', '@mariozechner/clipboard-darwin-x64',
   '@mariozechner/clipboard-linux-arm64-gnu', '@mariozechner/clipboard-linux-arm64-musl',
   '@mariozechner/clipboard-linux-x64-gnu', '@mariozechner/clipboard-linux-x64-musl',
   '@mariozechner/clipboard-win32-arm64-msvc', '@mariozechner/clipboard-win32-x64-msvc',

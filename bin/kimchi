@@ -106,6 +106,7 @@ CHILD_PID=$!
 PREV_SIZE=0
 STABLE=0
 ELAPSED=0
+KILLED=0
 
 while kill -0 "$CHILD_PID" 2>/dev/null; do
   sleep 1
@@ -124,6 +125,7 @@ while kill -0 "$CHILD_PID" 2>/dev/null; do
         sleep 0.5
         kill -KILL "$CHILD_PID" 2>/dev/null
       fi
+      KILLED=1
       break
     fi
   else
@@ -136,15 +138,26 @@ while kill -0 "$CHILD_PID" 2>/dev/null; do
       sleep 0.5
       kill -KILL "$CHILD_PID" 2>/dev/null
     fi
+    KILLED=1
     break
   fi
 done
 
-wait "$CHILD_PID" 2>/dev/null || true
+# Capture child exit code before wait clears it
+CHILD_EXIT=0
+if [ "$KILLED" -eq 0 ]; then
+  wait "$CHILD_PID" 2>/dev/null && CHILD_EXIT=0 || CHILD_EXIT=$?
+fi
 if [ -f "$OUTFILE" ]; then
   CUR_SIZE=$(stat -c%s "$OUTFILE" 2>/dev/null || echo 0)
   if [ "$CUR_SIZE" -gt "$PREV_SIZE" ]; then
     tail -c +$((PREV_SIZE + 1)) "$OUTFILE" 2>/dev/null || true
   fi
 fi
-exit 0
+# If we killed the process (output stability or timeout), exit 0 (output was produced).
+# If the child exited naturally, propagate its exit code (catches auth/API failures).
+if [ "$KILLED" -eq 1 ]; then
+  exit 0
+else
+  exit "$CHILD_EXIT"
+fi
