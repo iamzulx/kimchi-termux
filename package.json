@@ -1,7 +1,7 @@
 {
 	"name": "@kimchi-dev/cli",
 	"version": "0.0.0",
-	"description": "kimchi \u2014 a coding agent CLI powered by Cast AI",
+	"description": "kimchi — a coding agent CLI powered by Cast AI",
 	"type": "module",
 	"license": "Apache-2.0",
 	"bin": {
@@ -90,6 +90,7 @@
 		"@types/tar": "7.0.87",
 		"@types/turndown": "5.0.6",
 		"@types/ws": "8.18.1",
+		"esbuild": "0.27.7",
 		"husky": "9.1.7",
 		"node-pty": "1.1.0",
 		"playwright": "1.59.1",

@@ -7,16 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(__dirname, '..', 'package.json'));
 
-let build;
-try {
-  ({ build } = require('esbuild'));
-} catch {
-  const fallback = join(
-    process.env.HOME || '',
-    'kimchi/node_modules/.pnpm/esbuild@0.27.7/node_modules/esbuild/lib/main.js',
-  );
-  ({ build } = await import(fallback));
-}
+const { build } = require('esbuild');
 
 if (!existsSync('dist')) mkdirSync('dist');
 
